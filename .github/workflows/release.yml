@@ -55,14 +55,6 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
           echo "last_tag=$LAST_TAG" >> $GITHUB_OUTPUT
 
-      - name: Debug commits
-        run: |
-          echo "=== DEBUG COMMITS ==="
-          echo "Last tag: '${{ steps.get-commits.outputs.last_tag }}'"
-          echo "Commits:"
-          echo '${{ steps.get-commits.outputs.commits }}'
-          echo "=== END DEBUG ==="
-
       - name: Install Yandex CLI and configure docker auth
         run: |
           curl https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
@@ -97,11 +89,6 @@ jobs:
 
       - name: Update CHANGELOG.md
         run: |
-          echo "=== DEBUG CHANGELOG UPDATE ==="
-          echo "Current directory: $(pwd)"
-          echo "Files in current directory:"
-          ls -la
-
           # Create changelog entry
           echo "# Version ${{ github.run_number }}" > temp_changelog.md
           echo "" >> temp_changelog.md
@@ -112,42 +99,20 @@ jobs:
           echo "---" >> temp_changelog.md
           echo "" >> temp_changelog.md
 
-          echo "=== TEMP CHANGELOG CONTENT ==="
-          cat temp_changelog.md
-          echo "=== END TEMP CHANGELOG ==="
-
           # Prepend to existing CHANGELOG.md
           if [ -f "CHANGELOG.md" ]; then
-            echo "CHANGELOG.md exists, prepending..."
             cat temp_changelog.md CHANGELOG.md > temp_full_changelog.md
             mv temp_full_changelog.md CHANGELOG.md
           else
-            echo "CHANGELOG.md does not exist, creating new..."
             mv temp_changelog.md CHANGELOG.md
           fi
-
-          echo "=== FINAL CHANGELOG CONTENT ==="
-          cat CHANGELOG.md
-          echo "=== END FINAL CHANGELOG ==="
 
           # Commit and push changes
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add CHANGELOG.md
-          git status
           git commit -m "Update CHANGELOG.md for version ${{ github.run_number }}"
           git push origin releases/${{ github.run_number }}
-          echo "=== CHANGELOG UPDATE COMPLETE ==="
-
-      - name: Create Pull Request to main
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Update CHANGELOG.md for version ${{ github.run_number }}"
-          title: "Release ${{ github.run_number }} – update CHANGELOG.md"
-          body: "Automated PR to update CHANGELOG.md with commits from release."
-          base: main
-          branch: releases/${{ github.run_number }}
 
       - name: Create release issue
         uses: actions/github-script@v7

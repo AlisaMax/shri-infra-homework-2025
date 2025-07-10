@@ -115,6 +115,7 @@ jobs:
           git push origin releases/${{ github.run_number }}
 
       - name: Create Pull Request to main
+        id: cpr
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

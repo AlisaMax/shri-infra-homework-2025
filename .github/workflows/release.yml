@@ -128,7 +128,7 @@ jobs:
               title: `Release ${{ github.run_number }}`,
               body: `## Release Information
             
-**Date:** ${new Date().toISOString()}
+**Date:** ` + new Date().toISOString() + `
 **Author:** ${{ github.actor }}
 **Version:** ${{ github.run_number }}
 

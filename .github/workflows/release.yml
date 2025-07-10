@@ -62,11 +62,11 @@ jobs:
         run: |
           docker-credential-yc version || (echo "docker-credential-yc не установлен или не работает!" && exit 1)
 
-      - name: Проверка docker login через credential helper
-        run: |
-          docker logout cr.yandex || true
-          echo "Пробуем docker login через credential helper (yc)..."
-          docker login cr.yandex --username oauth --password $(yc iam create-token) || (echo "docker login через credential helper не удался!" && exit 1)
+      # - name: Проверка docker login через credential helper
+      #   run: |
+      #     docker logout cr.yandex || true
+      #     echo "Пробуем docker login через credential helper (yc)..."
+      #     docker login cr.yandex --username oauth --password $(yc iam create-token) || (echo "docker login через credential helper не удался!" && exit 1)
 
       - name: Build Docker image
         run: |

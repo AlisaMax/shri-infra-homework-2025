@@ -122,13 +122,9 @@ jobs:
               commitsText = `All commits (first release):\n\`\`\`\n${commits}\n\`\`\``;
             }
             
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Release ${{ github.run_number }}`,
-              body: `## Release Information
+            const body = `## Release Information
             
-**Date:** ` + new Date().toISOString() + `
+**Date:** ${new Date().toISOString()}
 **Author:** ${{ github.actor }}
 **Version:** ${{ github.run_number }}
 
@@ -139,5 +135,11 @@ jobs:
 ${commitsText}
 
 ## Release Branch
-\`releases/${{ github.run_number }}\``
-            })
+\`releases/${{ github.run_number }}\``;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Release ${{ github.run_number }}`,
+              body: body
+            });

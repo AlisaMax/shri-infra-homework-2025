@@ -39,6 +39,29 @@ jobs:
           cat ~/.docker/config.json
           rm key.json
 
+      - name: Проверка валидности ключа сервисного аккаунта
+        run: |
+          echo '${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}' > key.json
+          cat key.json | python3 -m json.tool || (echo "Секрет YC_SERVICE_ACCOUNT_KEY_JSON невалидный JSON!" && exit 1)
+
+      - name: Проверка работы yc CLI и доступа к реестру
+        run: |
+          export PATH="$PATH:$HOME/yandex-cloud/bin"
+          yc --version
+          yc config list
+          yc container registry list || (echo "Не удалось получить список реестров! Проверьте права сервисного аккаунта и cloud-id/folder-id." && exit 1)
+          yc container image list crp3t6gvtieggu7lip3q || (echo "Не удалось получить список образов в реестре! Проверьте права сервисного аккаунта и registry-id." && exit 1)
+
+      - name: Проверка docker-credential-yc
+        run: |
+          docker-credential-yc version || (echo "docker-credential-yc не установлен или не работает!" && exit 1)
+
+      - name: Проверка docker login через credential helper
+        run: |
+          docker logout cr.yandex || true
+          echo "Пробуем docker login через credential helper (yc)..."
+          docker login cr.yandex --username oauth --password $(yc iam create-token) || (echo "docker login через credential helper не удался!" && exit 1)
+
       - name: Build Docker image
         run: |
           docker build -t cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.run_number }} .

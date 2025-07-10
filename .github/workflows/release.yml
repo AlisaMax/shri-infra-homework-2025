@@ -114,6 +114,23 @@ jobs:
           git commit -m "Update CHANGELOG.md for version ${{ github.run_number }}"
           git push origin releases/${{ github.run_number }}
 
+      - name: Create Pull Request to main
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update CHANGELOG.md for version ${{ github.run_number }}"
+          title: "Release ${{ github.run_number }} – update CHANGELOG.md"
+          body: "Automated PR to update CHANGELOG.md with commits from release."
+          base: main
+          branch: releases/${{ github.run_number }}
+
+      - name: Enable auto-merge for Pull Request
+        uses: peter-evans/enable-pull-request-automerge@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+          merge-method: squash
+
       - name: Create release issue
         uses: actions/github-script@v7
         with:

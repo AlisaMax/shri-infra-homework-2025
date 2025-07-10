@@ -93,3 +93,6 @@ jobs:
               title: `Release ${{ github.run_number }}`,
               body: `Release created\n\nVersion: ${{ github.run_number }}\nDate: ${new Date().toISOString()}`,
             })
+
+      - name: Show Docker image size
+        run: docker images cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.run_number }}

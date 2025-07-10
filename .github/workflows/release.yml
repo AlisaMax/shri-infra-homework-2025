@@ -30,10 +30,18 @@ jobs:
           curl https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
           export PATH="$PATH:$HOME/yandex-cloud/bin"
           echo '${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}' > key.json
+          yc --version
           yc config set service-account-key key.json
           yc config set cloud-id b1g5bv1glb6q0iu7ujil
           yc config set folder-id b1gmgijkm3ugaq00n1le
           yc container registry configure-docker
+          docker-credential-yc version
+          cat ~/.docker/config.json
+
+      - name: Generate IAM token and docker login
+        run: |
+          export IAM_TOKEN=$(yc iam create-token)
+          echo $IAM_TOKEN | docker login --username iam --password-stdin cr.yandex
 
       - name: Build Docker image
         run: |

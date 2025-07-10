@@ -94,7 +94,7 @@ jobs:
           echo "" >> temp_changelog.md
           echo "---" >> temp_changelog.md
           echo "" >> temp_changelog.md
-          
+
           # Prepend to existing CHANGELOG.md
           if [ -f "CHANGELOG.md" ]; then
             cat temp_changelog.md CHANGELOG.md > temp_full_changelog.md
@@ -102,7 +102,7 @@ jobs:
           else
             mv temp_changelog.md CHANGELOG.md
           fi
-          
+
           # Commit and push changes
           git add CHANGELOG.md
           git commit -m "Update CHANGELOG.md for version ${{ github.run_number }}"
@@ -114,29 +114,25 @@ jobs:
           script: |
             const commits = `${{ steps.get-commits.outputs.commits }}`;
             const lastTag = '${{ steps.get-commits.outputs.last_tag }}';
-            
+
             let commitsText = '';
             if (lastTag) {
               commitsText = `Commits since ${lastTag}:\n\`\`\`\n${commits}\n\`\`\``;
             } else {
               commitsText = `All commits (first release):\n\`\`\`\n${commits}\n\`\`\``;
             }
-            
-            const body = `## Release Information
-            
-**Date:** ${new Date().toISOString()}
-**Author:** ${{ github.actor }}
-**Version:** ${{ github.run_number }}
 
-## Docker Image
-\`cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.run_number }}\`
+            const body = '## Release Information\n\n' +
+              '**Date:** ' + new Date().toISOString() + '\n' +
+              '**Author:** ${{ github.actor }}\n' +
+              '**Version:** ${{ github.run_number }}\n\n' +
+              '## Docker Image\n' +
+              '`cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.run_number }}`\n\n' +
+              '## Changes\n' +
+              commitsText + '\n\n' +
+              '## Release Branch\n' +
+              '`releases/${{ github.run_number }}`';
 
-## Changes
-${commitsText}
-
-## Release Branch
-\`releases/${{ github.run_number }}\``;
-            
             github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,

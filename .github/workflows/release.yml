@@ -36,8 +36,7 @@ jobs:
           yc config set folder-id b1gmgijkm3ugaq00n1le
           yc container registry configure-docker
           docker-credential-yc version
-          export IAM_TOKEN=$(yc iam create-token)
-          echo $IAM_TOKEN | docker login --username iam --password-stdin cr.yandex
+          cat ~/.docker/config.json
           rm key.json
 
       - name: Build Docker image

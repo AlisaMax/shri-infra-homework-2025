@@ -29,6 +29,9 @@ jobs:
         run: |
           curl https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
           export PATH="$PATH:$HOME/yandex-cloud/bin"
+          if [ -f "$HOME/yandex-cloud/bin/docker-credential-yc" ]; then
+            sudo cp "$HOME/yandex-cloud/bin/docker-credential-yc" /usr/local/bin/
+          fi
           echo '${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}' > key.json
           yc --version
           yc config set service-account-key key.json

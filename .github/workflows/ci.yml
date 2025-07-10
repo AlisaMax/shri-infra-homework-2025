@@ -8,6 +8,7 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    name: Lint and test
 
     steps:
       - name: Checkout repository

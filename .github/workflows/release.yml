@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -25,6 +27,30 @@ jobs:
       - name: Run tests
         run: npm run test
 
+      - name: Create release branch
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git checkout -b releases/${{ github.run_number }}
+          git push origin releases/${{ github.run_number }}
+
+      - name: Get commits since last release
+        id: get-commits
+        run: |
+          # Get the last release tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            # If no tags exist, get all commits
+            COMMITS=$(git log --oneline --no-merges | head -20)
+          else
+            # Get commits since last tag
+            COMMITS=$(git log --oneline --no-merges ${LAST_TAG}..HEAD)
+          fi
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "last_tag=$LAST_TAG" >> $GITHUB_OUTPUT
+
       - name: Install Yandex CLI and configure docker auth
         run: |
           curl https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
@@ -36,37 +62,11 @@ jobs:
             sudo cp "$HOME/yandex-cloud/bin/yc" /usr/local/bin/
           fi
           echo '${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}' > key.json
-          yc --version
           yc config set service-account-key key.json
           yc config set cloud-id b1g5bv1glb6q0iu7ujil
           yc config set folder-id b1gmgijkm3ugaq00n1le
           yc container registry configure-docker
-          docker-credential-yc version
-          cat ~/.docker/config.json
           rm key.json
-
-      - name: Проверка валидности ключа сервисного аккаунта
-        run: |
-          echo '${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}' > key.json
-          cat key.json | python3 -m json.tool || (echo "Секрет YC_SERVICE_ACCOUNT_KEY_JSON невалидный JSON!" && exit 1)
-
-      - name: Проверка работы yc CLI и доступа к реестру
-        run: |
-          export PATH="$PATH:$HOME/yandex-cloud/bin"
-          yc --version
-          yc config list
-          yc container registry list || (echo "Не удалось получить список реестров! Проверьте права сервисного аккаунта и cloud-id/folder-id." && exit 1)
-          yc container image list --registry-id crp3t6gvtieggu7lip3q || (echo "Не удалось получить список образов в реестре! Проверьте права сервисного аккаунта и registry-id." && exit 1)
-
-      - name: Проверка docker-credential-yc
-        run: |
-          docker-credential-yc version || (echo "docker-credential-yc не установлен или не работает!" && exit 1)
-
-      # - name: Проверка docker login через credential helper
-      #   run: |
-      #     docker logout cr.yandex || true
-      #     echo "Пробуем docker login через credential helper (yc)..."
-      #     docker login cr.yandex --username oauth --password $(yc iam create-token) || (echo "docker login через credential helper не удался!" && exit 1)
 
       - name: Build Docker image
         run: |
@@ -83,16 +83,58 @@ jobs:
           git tag ${{ github.run_number }}
           git push origin ${{ github.run_number }}
 
+      - name: Update CHANGELOG.md
+        run: |
+          # Create changelog entry
+          echo "# Version ${{ github.run_number }}" > temp_changelog.md
+          echo "" >> temp_changelog.md
+          echo "## Commits" >> temp_changelog.md
+          echo "" >> temp_changelog.md
+          echo '${{ steps.get-commits.outputs.commits }}' >> temp_changelog.md
+          echo "" >> temp_changelog.md
+          echo "---" >> temp_changelog.md
+          echo "" >> temp_changelog.md
+          
+          # Prepend to existing CHANGELOG.md
+          if [ -f "CHANGELOG.md" ]; then
+            cat temp_changelog.md CHANGELOG.md > temp_full_changelog.md
+            mv temp_full_changelog.md CHANGELOG.md
+          else
+            mv temp_changelog.md CHANGELOG.md
+          fi
+          
+          # Commit and push changes
+          git add CHANGELOG.md
+          git commit -m "Update CHANGELOG.md for version ${{ github.run_number }}"
+          git push origin releases/${{ github.run_number }}
+
       - name: Create release issue
         uses: actions/github-script@v7
         with:
           script: |
+            const commits = `${{ steps.get-commits.outputs.commits }}`;
+            const lastTag = '${{ steps.get-commits.outputs.last_tag }}';
+            
+            let commitsText = '';
+            if (lastTag) {
+              commitsText = `Commits since ${lastTag}:\n\`\`\`\n${commits}\n\`\`\``;
+            } else {
+              commitsText = `All commits (first release):\n\`\`\`\n${commits}\n\`\`\``;
+            }
+            
             github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `Release ${{ github.run_number }}`,
-              body: `Release created\n\nVersion: ${{ github.run_number }}\nDate: ${new Date().toISOString()}`,
-            })
+              body: `## Release Information
+            
+**Date:** ${new Date().toISOString()}
+**Author:** ${{ github.actor }}
+**Version:** ${{ github.run_number }}
 
-      - name: Show Docker image size
-        run: docker images cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.run_number }}
+\`cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.run_number }}\`
+
+${commitsText}
+
+\`releases/${{ github.run_number }}\``,
+            })

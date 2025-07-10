@@ -50,7 +50,7 @@ jobs:
           yc --version
           yc config list
           yc container registry list || (echo "Не удалось получить список реестров! Проверьте права сервисного аккаунта и cloud-id/folder-id." && exit 1)
-          yc container image list crp3t6gvtieggu7lip3q || (echo "Не удалось получить список образов в реестре! Проверьте права сервисного аккаунта и registry-id." && exit 1)
+          yc container image list --registry-id crp3t6gvtieggu7lip3q || (echo "Не удалось получить список образов в реестре! Проверьте права сервисного аккаунта и registry-id." && exit 1)
 
       - name: Проверка docker-credential-yc
         run: |

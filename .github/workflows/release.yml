@@ -132,9 +132,12 @@ jobs:
 **Author:** ${{ github.actor }}
 **Version:** ${{ github.run_number }}
 
+## Docker Image
 \`cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.run_number }}\`
 
+## Changes
 ${commitsText}
 
+## Release Branch
 \`releases/${{ github.run_number }}\``,
             })

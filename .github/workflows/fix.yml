@@ -79,12 +79,12 @@ jobs:
         run: |
           ISSUE_NUMBER=$(gh issue list --search "Release ${{ github.event.inputs.version }}" --json number --jq '.[0].number')
           echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
-
+      
       - name: Add comment to Issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh issue comment $ISSUE_NUMBER --body "$(cat << EOF
+          gh issue comment $ISSUE_NUMBER --body "$(cat <<EOF
 ### Fix Release
 **Date:** $(date)
 **Author:** ${{ github.actor }}

@@ -3,24 +3,20 @@ name: Fix Release
 on:
   workflow_dispatch:
     inputs:
-      release_version:
-        description: "Release version (например, 42)"
+      version:
+        description: "Release version to fix"
         required: true
         type: string
 
 jobs:
   fix-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
 
     steps:
       - name: Checkout release branch
         uses: actions/checkout@v3
         with:
-          ref: releases/${{ github.event.inputs.release_version }}
+          ref: releases/${{ github.event.inputs.version }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -34,7 +30,10 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Run tests
-        run: npm run test
+        run: npm test
+
+      - name: Build client (если нужно для docker)
+        run: npm run build
 
       - name: Install Yandex CLI and configure docker auth
         run: |
@@ -53,72 +52,37 @@ jobs:
           yc container registry configure-docker
           rm key.json
 
-      - name: Get fix number
-        id: fixnum
+      - name: Build docker image with fix and latest tags
         run: |
-          # Определяем номер фикса по количеству существующих тегов fix для этого релиза
-          FIXNUM=$(git tag | grep "^${{ github.event.inputs.release_version }}_fix" | wc -l)
-          FIXNUM=$((FIXNUM+1))
-          echo "fixnum=$FIXNUM" >> $GITHUB_OUTPUT
+          docker build -t cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_fix${{ github.run_number }} .
+          docker tag cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_fix${{ github.run_number }} cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_latest
 
-      - name: Build Docker image
+      - name: Push docker images
         run: |
-          docker build -t cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.release_version }}_fix${{ steps.fixnum.outputs.fixnum }} .
-          docker tag cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.release_version }}_fix${{ steps.fixnum.outputs.fixnum }} cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.release_version }}_latest
+          docker push cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_fix${{ github.run_number }}
+          docker push cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_latest
 
-      - name: Push Docker image
+      - name: Create git tag
         run: |
-          docker push cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.release_version }}_fix${{ steps.fixnum.outputs.fixnum }}
-          docker push cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.release_version }}_latest
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ github.event.inputs.version }}_fix${{ github.run_number }}
+          git push origin ${{ github.event.inputs.version }}_fix${{ github.run_number }}
 
-      - name: Create fix tag
+      - name: Install GitHub CLI
+        run: sudo apt update && sudo apt install -y gh
+
+      - name: Find release Issue number
+        id: find-issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git tag ${{ github.event.inputs.release_version }}_fix${{ steps.fixnum.outputs.fixnum }}
-          git push origin ${{ github.event.inputs.release_version }}_fix${{ steps.fixnum.outputs.fixnum }}
+          ISSUE_NUMBER=$(gh issue list --search "Release ${{ github.event.inputs.version }}" --json number --jq '.[0].number')
+          echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
 
-      - name: Get commits since last tag
-        id: get-commits
+      - name: Add comment to Issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Получаем предыдущий релизный или фиксрелизный тег
-          LAST_TAG=$(git tag --sort=-creatordate | grep -E "^${{ github.event.inputs.release_version }}(_fix[0-9]+)?$" | head -2 | tail -1)
-          if [ -z "$LAST_TAG" ]; then
-            COMMITS=$(git log --oneline --no-merges | head -20)
-          else
-            COMMITS=$(git log --oneline --no-merges ${LAST_TAG}..HEAD)
-          fi
-          echo "commits<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMITS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "last_tag=$LAST_TAG" >> $GITHUB_OUTPUT
-
-      - name: Add comment to release Issue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const commits = `${{ steps.get-commits.outputs.commits }}`;
-            const fixnum = '${{ steps.fixnum.outputs.fixnum }}';
-            const releaseVersion = '${{ github.event.inputs.release_version }}';
-            const body = '### Fix Release\n' +
-              '**Date:** ' + new Date().toISOString() + '\n' +
-              '**Author:** ${{ github.actor }}\n' +
-              '**Fix version:** ' + releaseVersion + '_fix' + fixnum + '\n' +
-              '**Docker image:** cr.yandex/crp3t6gvtieggu7lip3q/app:' + releaseVersion + '_fix' + fixnum + '\n' +
-              '\n**Commits:**\n```\n' + commits + '\n```';
-
-            // Найти Issue по названию "Release <releaseVersion>"
-            const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open'
-            });
-            const issue = issues.data.find(i => i.title === `Release ${releaseVersion}`);
-            if (issue) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                body
-              });
-            }
+          gh issue comment $ISSUE_NUMBER \
+          --body "### Fix Release\n**Date:** $(date)\n**Author:** ${{ github.actor }}\n**Fix version:** ${{ github.event.inputs.version }}_fix${{ github.run_number }}\n**Docker image:** cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_fix${{ github.run_number }}\n\n**Commits:**\n\`\`\`\n$(git log $(git describe --tags --abbrev=0)..HEAD --oneline)\n\`\`\`"

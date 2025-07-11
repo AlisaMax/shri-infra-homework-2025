@@ -84,5 +84,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh issue comment $ISSUE_NUMBER \
-          --body "### Fix Release\n**Date:** $(date)\n**Author:** ${{ github.actor }}\n**Fix version:** ${{ github.event.inputs.version }}_fix${{ github.run_number }}\n**Docker image:** cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_fix${{ github.run_number }}\n\n**Commits:**\n\`
+          gh issue comment $ISSUE_NUMBER --body "$(cat << EOF
+### Fix Release
+**Date:** $(date)
+**Author:** ${{ github.actor }}
+**Fix version:** ${{ github.event.inputs.version }}_fix${{ github.run_number }}
+**Docker image:** cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_fix${{ github.run_number }}
+
+**Commits:**
+\`\`\`
+$(git log $(git describe --tags --abbrev=0)..HEAD --oneline)
+\`\`\`
+EOF
+)"

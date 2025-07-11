@@ -79,21 +79,21 @@ jobs:
         run: |
           ISSUE_NUMBER=$(gh issue list --search "Release ${{ github.event.inputs.version }}" --json number --jq '.[0].number')
           echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
-      
+
       - name: Add comment to Issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue comment $ISSUE_NUMBER --body "$(cat <<EOF
-### Fix Release
-**Date:** $(date)
-**Author:** ${{ github.actor }}
-**Fix version:** ${{ github.event.inputs.version }}_fix${{ github.run_number }}
-**Docker image:** cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_fix${{ github.run_number }}
+          ### Fix Release
+          **Date:** $(date)
+          **Author:** ${{ github.actor }}
+          **Fix version:** ${{ github.event.inputs.version }}_fix${{ github.run_number }}
+          **Docker image:** cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_fix${{ github.run_number }}
 
-**Commits:**
-\`\`\`
-$(git log $(git describe --tags --abbrev=0)..HEAD --oneline)
-\`\`\`
-EOF
-)"
+          **Commits:**
+          \`\`\`
+          $(git log $(git describe --tags --abbrev=0)..HEAD --oneline)
+          \`\`\`
+          EOF
+          )"

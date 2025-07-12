@@ -1,0 +1,76 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version"
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Yandex Cloud CLI
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          echo "${HOME}/yandex-cloud/bin" >> $GITHUB_PATH
+
+      - name: Authenticate to Yandex Cloud
+        run: |
+          echo '${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}' > key.json
+          yc config set service-account-key key.json
+          yc config set cloud-id b1g5bv1glb6q0iu7ujil
+          yc config set folder-id b1gmgijkm3ugaq00n1le
+          yc config set compute-default-zone ru-central1-a
+
+      - name: Check image exists in Container Registry
+        run: |
+          echo "Checking if image exists in Container Registry..."
+          IMAGE_EXISTS=$(yc container image list --format json | jq -r '.[] | select(.tags[] | test("${{ github.event.inputs.version }}_latest")) | .id')
+          if [ -z "$IMAGE_EXISTS" ]; then
+            echo "Image with tag ${{ github.event.inputs.version }}_latest not found"
+            exit 1
+          else
+            echo "Image found: $IMAGE_EXISTS"
+          fi
+
+      - name: Deploy to production via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            docker pull cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_latest
+            docker stop shri-infra-app || true
+            docker rm shri-infra-app || true
+            docker run -d --name shri-infra-app -p 80:3000 cr.yandex/crp3t6gvtieggu7lip3q/app:${{ github.event.inputs.version }}_latest
+
+      - name: Install GitHub CLI
+        run: sudo apt update && sudo apt install -y gh
+
+      - name: Find release Issue number
+        id: find-issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUMBER=$(gh issue list --search "Release ${{ github.event.inputs.version }}" --json number --jq '.[0].number')
+          echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
+
+      - name: Comment about deployment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment $ISSUE_NUMBER --body "$(cat <<EOF
+          ### Production Deployment
+          Release **${{ github.event.inputs.version }}** deployed to production
+          **Date:** $(date)
+          **Deployed by:** @${{ github.actor }}
+          EOF
+          )"

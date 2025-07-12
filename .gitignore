@@ -2,4 +2,3 @@ output.html
 node_modules
 .DS_Store
 dist
-deploy.yml
